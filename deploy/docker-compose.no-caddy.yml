@@ -1,0 +1,41 @@
+name: quickly
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: quickly
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: azowail/quickly:v2.4.0
+    restart: unless-stopped
+    # Bound to loopback only: this stack has no TLS/auth in front of it by
+    # itself. Your existing reverse proxy (nginx, Caddy, Traefik, etc.) talks
+    # to it over 127.0.0.1 and terminates HTTPS on 80/443, which it already
+    # owns. This container never touches those ports.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://postgres:postgres@db:5432/quickly"
+      QUICKLY_PREBUILT_IMAGE: "1"
+    volumes:
+      - ./backups:/app/backups
+
+volumes:
+  pgdata:
+    external: true
+    name: quickly_pgdata
