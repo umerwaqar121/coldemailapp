@@ -30,12 +30,16 @@ deploy/
   samples/leads.csv              example CSV in the required format
 ```
 
-The installer never touches Docker containers, volumes, or apt sources
-belonging to anything else already running on your VPS. It creates its own
-`quickly` Docker project and `quickly_pgdata` volume, and by default binds
-the app to `127.0.0.1:8000` only — it does not take over ports 80/443 unless
-you explicitly tell it to (and it detects if something's already listening
-there first).
+The installer is **non-interactive** and never touches Docker/containerd
+themselves, nginx's main config, or anything belonging to other services
+already on the box. It only ever: creates `/opt/quickly`, an isolated
+`quickly` Docker Compose project, a `quickly_pgdata` volume, and — only if
+you pass a domain — one new file at `/etc/nginx/sites-available/quickly.conf`
+(validated with `nginx -t` and rolled back automatically if that fails, then
+reloaded, never restarted). It auto-picks a free loopback port in 8000–8010
+instead of assuming 8000 is free. `docker-compose.caddy.yml` is included only
+for a bare VPS with no existing web server — the installer never chooses it
+on its own.
 
 ## Installation (run on your Ubuntu VPS, not here)
 
@@ -44,32 +48,31 @@ there first).
    scp -r deploy your-vps:/tmp/quickly-deploy
    ssh your-vps
    ```
-2. Before running anything, confirm what's already using ports 80/443 if
-   you're not sure:
-   ```
-   sudo ss -ltnp | grep -E ':80|:443'
-   ```
-3. Run the installer:
+2. Run the installer. If you already have a domain/subdomain pointed at
+   this VPS for Quickly, pass it so the script also wires up nginx:
    ```
    cd /tmp/quickly-deploy
+   sudo QUICKLY_DOMAIN=mail.yourdomain.com bash install.sh
+   ```
+   Or, to just bring the containers up and wire the reverse proxy yourself
+   later:
+   ```
    sudo bash install.sh
    ```
-   - If something is already on 80/443 (your existing site/app), it
-     auto-selects the **no-caddy** variant — Quickly only binds to
-     `127.0.0.1:8000`, and you point your existing reverse proxy at it
-     (sample config: `nginx-quickly.conf.example`).
-   - If nothing is on 80/443, it asks whether you want Quickly's bundled
-     Caddy to handle HTTPS automatically for a domain you give it.
-4. Once it's reachable at `https://your-domain`, open it in a browser.
-   **The first account you create becomes the admin, and registration
-   closes after that** — so do this yourself first, immediately.
+   Read the top of `install.sh` first — it documents exactly what it will
+   and won't touch, including the three existing `aether-*`/`voice-agent`
+   services and nginx.
+3. If you passed `QUICKLY_DOMAIN`, get a certificate the same way you do
+   for your other sites, e.g. `sudo certbot --nginx -d mail.yourdomain.com`.
+4. Open the site in a browser. **The first account you create becomes the
+   admin, and registration closes after that** — so do this yourself
+   first, immediately.
 
-If you ever need to add Gmail or Microsoft OAuth, edit
-`/opt/quickly/.env` on the VPS, then re-run:
+If you ever need to add Gmail or Microsoft OAuth, edit `/opt/quickly/.env`
+on the VPS, then re-run:
 ```
 docker compose -p quickly -f docker-compose.no-caddy.yml up -d
 ```
-(swap the filename if you used the caddy variant).
 
 ---
 

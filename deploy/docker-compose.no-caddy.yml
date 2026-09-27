@@ -24,7 +24,7 @@ services:
     # to it over 127.0.0.1 and terminates HTTPS on 80/443, which it already
     # owns. This container never touches those ports.
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${QUICKLY_HOST_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
